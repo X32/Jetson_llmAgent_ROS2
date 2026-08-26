@@ -1,0 +1,202 @@
+<?xml version="1.0"?>
+<!-- xacro 命名空间声明，必须 -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="my_robot">
+
+  <!-- ========== ① 参数区：所有尺寸集中这里，改一处全局生效 ========== -->
+  <xacro:property name="wheel_radius"     value="0.15"/>   <!-- 轮半径 m -->
+  <xacro:property name="wheel_separation" value="0.70"/>   <!-- 左右轮距 m（DiffDrive 也要用） -->
+  <xacro:property name="wheel_width"      value="0.06"/>
+  <xacro:property name="chassis_len"      value="0.80"/>
+  <xacro:property name="chassis_wid"      value="0.60"/>
+  <xacro:property name="chassis_hei"      value="0.20"/>
+  <xacro:property name="caster_radius"    value="0.05"/>
+  <xacro:property name="chassis_mass"     value="20.0"/>
+  <xacro:property name="wheel_mass"       value="2.0"/>
+
+  <!-- ========== ② 车体 base_link（ROS 惯例：车体中心 = base_link）========== -->
+  <!-- base_link 原点定在车体几何中心，离地 0.25m（轮心 0.15 + 上移 0.10） -->
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <box size="${chassis_len} ${chassis_wid} ${chassis_hei}"/>
+      </geometry>
+      <material name="blue"><color rgba="0.2 0.2 0.8 1"/></material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="${chassis_len} ${chassis_wid} ${chassis_hei}"/>
+      </geometry>
+    </collision>
+    <!-- 惯量用 box 公式 I=m(b²+c²)/12 直接算出来，Gazebo 物理仿真必须有 -->
+    <inertial>
+      <mass value="${chassis_mass}"/>
+      <inertia ixx="${chassis_mass*(chassis_wid**2+chassis_hei**2)/12}" ixy="0" ixz="0"
+               iyy="${chassis_mass*(chassis_len**2+chassis_hei**2)/12}" iyz="0"
+               izz="${chassis_mass*(chassis_len**2+chassis_wid**2)/12}"/>
+    </inertial>
+  </link>
+
+  <!-- ========== ③ 轮子宏：定义一次，左右各调用一次 ========== -->
+  <!-- y_off: 左轮 +，右轮 -；prefix: left/right；side: 左 +1 / 右 -1（标记条镜像用） -->
+  <xacro:macro name="wheel" params="prefix y_off side">
+    <link name="${prefix}_wheel">
+      <visual>
+        <!-- 关键！URDF 圆柱默认轴向是 Z，绕 X 转 90° 后轴向变 Y（左右方向），轮子才能滚 -->
+        <origin rpy="${pi/2} 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+        <!-- 轮胎主体换成亮橙色：纯黑圆柱在深色背景里看不清 -->
+        <material name="orange"><color rgba="1.0 0.45 0.05 1"/></material>
+      </visual>
+      <!-- 标记条①：贴在外侧轮面的白色长条。圆柱是轴对称体，转不转一个样；
+           加了不对称标记，旋转时肉眼立刻可辨（原理同车轮辐条/气门嘴）
+           side 参数：左轮 +1 / 右轮 -1。y 位置乘 side 后，
+           左轮标记条在 +y（左外侧），右轮镜像到 -y（右外侧）——两侧都朝外
+           注意：material name 不能与轮子主体同名——rviz 渲染时同名材质会
+           整个 link 统一着色，标记条就"消失"在轮子同色里 -->
+      <visual>
+        <origin xyz="0 ${side*(wheel_width/2 + 0.005)} ${wheel_radius*0.55}"/>
+        <geometry>
+          <box size="0.06 0.01 0.12"/>
+        </geometry>
+        <material name="wheel_mark_a"><color rgba="1 1 1 1"/></material>
+      </visual>
+      <!-- 标记条②：对面一条，转动时两条交替扫过，更明显 -->
+      <visual>
+        <origin xyz="0 ${side*(wheel_width/2 + 0.005)} ${-wheel_radius*0.55}"/>
+        <geometry>
+          <box size="0.06 0.01 0.12"/>
+        </geometry>
+        <material name="wheel_mark_b"><color rgba="1 1 1 1"/></material>
+      </visual>
+      <collision>
+        <origin rpy="${pi/2} 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="${wheel_mass}"/>
+        <!-- 圆柱惯量公式：Ixx=Iyy=m(3r²+h²)/12，Izz=mr²/2 -->
+        <inertia ixx="${wheel_mass*(3*wheel_radius**2+wheel_width**2)/12}" ixy="0" ixz="0"
+                 iyy="${wheel_mass*(3*wheel_radius**2+wheel_width**2)/12}" iyz="0"
+                 izz="${wheel_mass*wheel_radius**2/2}"/>
+      </inertial>
+    </link>
+
+    <!-- continuous = 无限旋转（轮子没有转角限制，用 revolute 要写巨大 limit，不优雅） -->
+    <joint name="${prefix}_wheel_joint" type="continuous">
+      <parent link="base_link"/>
+      <child link="${prefix}_wheel"/>
+      <!-- 轮心相对 base_link：y = ±(半车宽+半轮宽)，z = -0.10（0.15轮心-0.25车心） -->
+      <origin xyz="0 ${y_off} -0.10" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>   <!-- 旋转轴 = 车体 Y 轴（与 Day4 SDF 同一个知识点） -->
+      <limit effort="10" velocity="10"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:wheel prefix="left"  y_off="${chassis_wid/2 + wheel_width/2}"  side="1"/>
+  <xacro:wheel prefix="right" y_off="${-(chassis_wid/2 + wheel_width/2)}" side="-1"/>
+
+  <!-- ========== ④ 前后万向球：三点支撑保持水平（Day4 的教训）========== -->
+  <xacro:macro name="caster" params="prefix x_off">
+    <link name="${prefix}_caster">
+      <visual>
+        <geometry><sphere radius="${caster_radius}"/></geometry>
+        <material name="gray"><color rgba="0.3 0.3 0.3 1"/></material>
+      </visual>
+      <collision>
+        <geometry><sphere radius="${caster_radius}"/></geometry>
+      </collision>
+      <inertial>
+        <mass value="1.0"/>
+        <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+      </inertial>
+    </link>
+    <!-- 焊死在车体上（fixed）；摩擦在下面 gazebo 标签里设为 0 -->
+    <joint name="${prefix}_caster_joint" type="fixed">
+      <parent link="base_link"/>
+      <child link="${prefix}_caster"/>
+      <origin xyz="${x_off} 0 -0.20" rpy="0 0 0"/>  <!-- -0.20 = 0.05球心离地 - 0.25车心 -->
+    </joint>
+  </xacro:macro>
+
+  <xacro:caster prefix="front" x_off="0.30"/>
+  <xacro:caster prefix="rear"  x_off="-0.30"/>
+
+  <!-- ========== ⑤ 激光雷达：车顶中央，Day9 state_query 的数据源 ========== -->
+  <link name="lidar_link">
+    <visual>
+      <geometry><cylinder radius="0.05" length="0.06"/></geometry>
+      <material name="dark"><color rgba="0 0 0 1"/></material>
+    </visual>
+    <inertial>
+      <mass value="0.5"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+    </inertial>
+  </link>
+
+  <joint name="lidar_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="lidar_link"/>
+    <origin xyz="0 0 0.13" rpy="0 0 0"/>   <!-- 车顶上方：0.35车顶 + 0.03半高 - 0.25 = 0.13 -->
+  </joint>
+
+  <!-- ========== ⑥ gazebo 标签：URDF 里嵌 Gazebo 专属配置 ========== -->
+  <!-- URDF 管结构，物理和传感器塞在 <gazebo> 标签里，转 SDF 时原样带过去 -->
+
+  <!-- 传感器挂在哪个 link 上，reference 就写谁 -->
+  <gazebo reference="lidar_link">
+    <sensor name="lidar" type="gpu_lidar">
+      <update_rate>10</update_rate>
+      <topic>/scan</topic>                    <!-- 这次直接用社区惯例名 /scan -->
+      <gz_frame_id>lidar_link</gz_frame_id>   <!-- 必须与 URDF link 名一致！Day4 的坑 -->
+      <lidar>
+        <scan>
+          <horizontal>
+            <samples>360</samples>
+            <resolution>1</resolution>
+            <min_angle>-3.14159</min_angle>
+            <max_angle>3.14159</max_angle>
+          </horizontal>
+        </scan>
+        <range>
+          <min>0.12</min>
+          <max>12.0</max>
+          <resolution>0.01</resolution>
+        </range>
+      </lidar>
+      <always_on>true</always_on>
+      <visualize>true</visualize>
+    </sensor>
+  </gazebo>
+
+  <!-- 万向球零摩擦：否则转弯时和驱动轮打架（Day4 的教训） -->
+  <gazebo reference="front_caster"><mu1>0.0</mu1><mu2>0.0</mu2></gazebo>
+  <gazebo reference="rear_caster"><mu1>0.0</mu1><mu2>0.0</mu2></gazebo>
+
+  <!-- Gazebo 里车体/轮子的显示颜色（URDF 的 color rgba Gazebo 不认，要用它自己的材质名） -->
+  <gazebo reference="base_link"><material>Gazebo/Blue</material></gazebo>
+  <gazebo reference="left_wheel"><material>Gazebo/Orange</material></gazebo>
+  <gazebo reference="right_wheel"><material>Gazebo/Orange</material></gazebo>
+
+  <!-- 差速驱动插件：模型级配置（不带 reference） -->
+  <!-- Fortress 插件名是 ignition-*，写成 gz-* 会报 couldn't find shared library（Day4 坑3） -->
+  <gazebo>
+    <plugin filename="ignition-gazebo-diff-drive-system"
+            name="ignition::gazebo::systems::DiffDrive">
+      <left_joint>left_wheel_joint</left_joint>
+      <right_joint>right_wheel_joint</right_joint>
+      <wheel_separation>${wheel_separation}</wheel_separation>   <!-- 与上面轮距参数同一个变量！ -->
+      <wheel_radius>${wheel_radius}</wheel_radius>               <!-- 同一个轮半径变量！ -->
+      <odom_publish_frequency>30</odom_publish_frequency>
+      <topic>/cmd_vel</topic>                                    <!-- 直接订阅标准话题名，省一次 remap -->
+    </plugin>
+
+    <!-- 轮子转角上报 → 桥到 /joint_states → robot_state_publisher → rviz 轮子会转 -->
+    <plugin filename="ignition-gazebo-joint-state-publisher-system"
+            name="ignition::gazebo::systems::JointStatePublisher"/>
+  </gazebo>
+
+</robot>

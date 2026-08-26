@@ -1,0 +1,13 @@
+digraph G {
+"robot" -> "robot/lidar_link"[label=" Broadcaster: default_authority\nAverage rate: 29.612\nBuffer length: 4.998\nMost recent transform: 7438.146\nOldest transform: 7433.148\n"];
+"robot" -> "robot/camera_link"[label=" Broadcaster: default_authority\nAverage rate: 29.612\nBuffer length: 4.998\nMost recent transform: 7438.146\nOldest transform: 7433.148\n"];
+"robot" -> "robot/rear_caster"[label=" Broadcaster: default_authority\nAverage rate: 29.612\nBuffer length: 4.998\nMost recent transform: 7438.146\nOldest transform: 7433.148\n"];
+"robot" -> "robot/caster"[label=" Broadcaster: default_authority\nAverage rate: 29.612\nBuffer length: 4.998\nMost recent transform: 7438.146\nOldest transform: 7433.148\n"];
+"robot" -> "robot/right_wheel"[label=" Broadcaster: default_authority\nAverage rate: 29.612\nBuffer length: 4.998\nMost recent transform: 7438.146\nOldest transform: 7433.148\n"];
+"robot" -> "robot/left_wheel"[label=" Broadcaster: default_authority\nAverage rate: 29.612\nBuffer length: 4.998\nMost recent transform: 7438.146\nOldest transform: 7433.148\n"];
+"robot" -> "robot/chassis"[label=" Broadcaster: default_authority\nAverage rate: 29.612\nBuffer length: 4.998\nMost recent transform: 7438.146\nOldest transform: 7433.148\n"];
+edge [style=invis];
+ subgraph cluster_legend { style=bold; color=black; label ="view_frames Result";
+"Recorded at time: 1787226896.7866948"[ shape=plaintext ] ;
+}->"robot";
+}

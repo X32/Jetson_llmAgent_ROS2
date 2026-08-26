@@ -1,0 +1,41 @@
+# ===== colcon 编译产物（可重新生成）=====
+build/
+install/
+log/
+
+# ===== 模型文件（2GB+，绝不入库）=====
+models/
+*.onnx
+*.onnx_data
+*.gguf
+*.tar.bz2
+
+# ===== 个人学习文档（不入服务器）=====
+DOC/
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# ===== 测试音频 / 录屏产物 =====
+*.wav
+*.mp4
+*.mp3
+
+# ===== 大体积资源文件 =====
+*.ttf
+
+# ===== IDE / 编辑器 / 系统 =====
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+
+# ===== 杂项 =====
+*.log
+node_modules/

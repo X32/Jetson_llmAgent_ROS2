@@ -1,0 +1,25 @@
+# 摄像头发布者参数配置
+camera_publisher:
+  ros__parameters:
+    # 摄像头设备号 (0 = /dev/video0, 1 = /dev/video1, etc.)
+    camera_device: 0
+
+    # 发布频率 (Hz)
+    publish_frequency: 30.0
+
+    # 图像分辨率
+    image_width: 640
+    image_height: 480
+
+    # 像素格式 (0=自动, 1=MJPG, 2=YUYV)
+    # MJPG通常性能更好，推荐使用
+    pixel_format: 1
+
+# 摄像头订阅者参数配置
+camera_subscriber:
+  ros__parameters:
+    # 是否显示图像窗口
+    show_image: true
+
+    # 窗口名称
+    window_name: "ROS2 Camera Subscriber"

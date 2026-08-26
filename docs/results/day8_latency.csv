@@ -1,0 +1,14 @@
+﻿idx,text,asr_text,audio_s,asr_ms,fc_ms,msg_ms,action,status,e2e
+1,左转90度。,左转90度。,1.38,139,2377,0.1,turn_left,success,3.033
+2,前进4米。,前进4米。,1.61,160,418,0.1,move_forward,success,1.079
+3,停止。,停止。,1.03,115,371,0.1,stop,success,0.988
+4,右转180度。,右转180度。,2.18,200,471,0.1,turn_right,success,1.179
+5,向前走一米。,向前走一米。,1.57,159,445,0.1,move_forward,success,1.127
+6,再走远一点。,再走远一点。,1.51,143,585,0.1,move_forward,success,1.266
+7,停止。,停止。,0.81,95,405,0.1,stop,success,1.001
+8,飞到月球。,飞到月球。,1.19,128,1,0.0,,rejected,
+9,左转90度。,左转90度。,1.25,134,506,0.1,turn_left,success,1.163
+10,向前走一米。,向前走一米。,1.54,160,451,0.1,move_forward,success,1.137
+11,再走远一点。,再走远一点。,1.35,142,487,0.1,move_forward,success,1.166
+12,停下。,停下。,0.84,99,435,0.1,stop,success,1.036
+13,到月球。,到月球。,1.03,130,1,0.0,,rejected,

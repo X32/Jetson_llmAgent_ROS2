@@ -1,0 +1,423 @@
+<?xml version="1.0" ?>
+<!--
+  多传感器差速小车（Gazebo Fortress / Ignition Gazebo 6）
+  包含：GPU 激光雷达 + 摄像头 + 差速驱动里程计
+  话题：
+    /lidar                 LaserScan
+    /camera                Image
+    /camera_info           CameraInfo
+    /model/robot/cmd_vel   Twist（控制）
+    /model/robot/odometry  Odometry
+-->
+<sdf version="1.8">
+  <world name="multi_sensor_demo">
+
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <!-- 世界级系统插件：物理 / 传感器渲染 / 基础服务（缺 Sensors 相机和雷达不会有数据！） -->
+    <plugin filename="ignition-gazebo-physics-system"
+            name="ignition::gazebo::systems::Physics">
+    </plugin>
+    <plugin filename="ignition-gazebo-sensors-system"
+            name="ignition::gazebo::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="ignition-gazebo-user-commands-system"
+            name="ignition::gazebo::systems::UserCommands">
+    </plugin>
+    <plugin filename="ignition-gazebo-scene-broadcaster-system"
+            name="ignition::gazebo::systems::SceneBroadcaster">
+    </plugin>
+
+    <light name="sun" type="directional">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.8 0.8 0.8 1</ambient>
+            <diffuse>0.8 0.8 0.8 1</diffuse>
+            <specular>0.8 0.8 0.8 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- 几个障碍物，方便雷达/相机有东西可看 -->
+    <model name="box1">
+      <static>true</static>
+      <pose>3 0 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>1 1 1</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>1 1 1</size></box></geometry>
+          <material>
+            <ambient>0.8 0.2 0.2 1</ambient>
+            <diffuse>0.8 0.2 0.2 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="box2">
+      <static>true</static>
+      <pose>0 3 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.8 0.8 1</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.8 0.8 1</size></box></geometry>
+          <material>
+            <ambient>0.2 0.8 0.2 1</ambient>
+            <diffuse>0.2 0.8 0.2 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="cylinder1">
+      <static>true</static>
+      <pose>-3 1 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><cylinder><radius>0.5</radius><length>1</length></cylinder></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><cylinder><radius>0.5</radius><length>1</length></cylinder></geometry>
+          <material>
+            <ambient>0.2 0.2 0.8 1</ambient>
+            <diffuse>0.2 0.2 0.8 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ==================== 机器人 ==================== -->
+    <!--
+      坐标约定（均相对 model 原点）：
+        车体中心 chassis : x=0    z=0.30（box 1.0 x 0.8 x 0.3）
+        左后轮           : x=-0.2 y=+0.45 z=0.15（半径 0.15，贴地）
+        右后轮           : x=-0.2 y=-0.45 z=0.15
+        前支撑万向球     : x=+0.4 z=0.08（半径 0.08）
+        后支撑万向球     : x=+0.4 z=0.08（半径 0.08）
+        相机             : x=+0.45 z=0.45（车头前上方）
+        激光雷达         : x=0    z=0.50（车顶中央）
+      轮子圆柱默认轴向为 Z，绕 X 轴转 90° 后轴向变为 Y（车体左右方向），
+      关节旋转轴即 <xyz>0 1 0</xyz>，这样轮子才真正"滚"起来。
+    -->
+    <model name="robot">
+
+      <!-- 车体 -->
+      <link name="chassis">
+        <pose relative_to="__model__">0 0 0.3 0 0 0</pose>
+        <inertial>
+          <mass>20.0</mass>
+          <inertia>
+            <ixx>0.65</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>1.15</iyy><iyz>0</iyz>
+            <izz>1.65</izz>
+          </inertia>
+        </inertial>
+        <visual name="chassis_visual">
+          <geometry>
+            <box><size>1.0 0.8 0.3</size></box>
+          </geometry>
+          <material>
+            <ambient>0.2 0.2 0.8 1</ambient>
+            <diffuse>0.2 0.2 0.8 1</diffuse>
+          </material>
+        </visual>
+        <collision name="chassis_collision">
+          <geometry>
+            <box><size>1.0 0.8 0.3</size></box>
+          </geometry>
+        </collision>
+      </link>
+
+      <!-- 左轮：圆柱绕 X 转 90°，轴向对齐车体 Y -->
+      <link name="left_wheel">
+        <pose relative_to="chassis">-0.2 0.45 -0.15 1.5707 0 0</pose>
+        <inertial>
+          <mass>2.0</mass>
+          <inertia>
+            <ixx>0.02</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>0.02</iyy><iyz>0</iyz>
+            <izz>0.03</izz>
+          </inertia>
+        </inertial>
+        <visual name="left_wheel_visual">
+          <geometry>
+            <cylinder><radius>0.15</radius><length>0.08</length></cylinder>
+          </geometry>
+          <material>
+            <ambient>0.15 0.15 0.15 1</ambient>
+            <diffuse>0.15 0.15 0.15 1</diffuse>
+          </material>
+        </visual>
+        <collision name="left_wheel_collision">
+          <geometry>
+            <cylinder><radius>0.15</radius><length>0.08</length></cylinder>
+          </geometry>
+        </collision>
+      </link>
+
+      <!-- 右轮 -->
+      <link name="right_wheel">
+        <pose relative_to="chassis">-0.2 -0.45 -0.15 1.5707 0 0</pose>
+        <inertial>
+          <mass>2.0</mass>
+          <inertia>
+            <ixx>0.02</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>0.02</iyy><iyz>0</iyz>
+            <izz>0.03</izz>
+          </inertia>
+        </inertial>
+        <visual name="right_wheel_visual">
+          <geometry>
+            <cylinder><radius>0.15</radius><length>0.08</length></cylinder>
+          </geometry>
+          <material>
+            <ambient>0.15 0.15 0.15 1</ambient>
+            <diffuse>0.15 0.15 0.15 1</diffuse>
+          </material>
+        </visual>
+        <collision name="right_wheel_collision">
+          <geometry>
+            <cylinder><radius>0.15</radius><length>0.08</length></cylinder>
+          </geometry>
+        </collision>
+      </link>
+
+      <!-- 前支撑万向球，防止车头着地 -->
+      <link name="caster">
+        <pose relative_to="chassis">0.3 0 -0.22 0 0 0</pose>
+        <inertial>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>0.005</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>0.005</iyy><iyz>0</iyz>
+            <izz>0.005</izz>
+          </inertia>
+        </inertial>
+        <visual name="caster_visual">
+          <geometry><sphere><radius>0.08</radius></sphere></geometry>
+          <material>
+            <ambient>0.3 0.3 0.3 1</ambient>
+            <diffuse>0.3 0.3 0.3 1</diffuse>
+          </material>
+        </visual>
+        <collision name="caster_collision">
+          <geometry><sphere><radius>0.08</radius></sphere></geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>0</mu>
+                <mu2>0</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+      </link>
+
+      <!-- 后支撑万向球：与前方支撑对称，让车体保持水平 -->
+      <link name="rear_caster">
+        <pose relative_to="chassis">-0.7 0 -0.22 0 0 0</pose>
+        <inertial>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>0.005</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>0.005</iyy><iyz>0</iyz>
+            <izz>0.005</izz>
+          </inertia>
+        </inertial>
+        <visual name="rear_caster_visual">
+          <geometry><sphere><radius>0.08</radius></sphere></geometry>
+          <material>
+            <ambient>0.3 0.3 0.3 1</ambient>
+            <diffuse>0.3 0.3 0.3 1</diffuse>
+          </material>
+        </visual>
+        <collision name="rear_caster_collision">
+          <geometry><sphere><radius>0.08</radius></sphere></geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>0</mu>
+                <mu2>0</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+      </link>
+
+      <!-- 摄像头（车头前上方，朝前看） -->
+      <link name="camera_link">
+        <pose relative_to="chassis">0.55 0 0.15 0 0 0</pose>
+        <inertial>
+          <mass>0.2</mass>
+          <inertia>
+            <ixx>0.001</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>0.001</iyy><iyz>0</iyz>
+            <izz>0.001</izz>
+          </inertia>
+        </inertial>
+        <visual name="camera_visual">
+          <geometry><box><size>0.05 0.15 0.08</size></box></geometry>
+          <material>
+            <ambient>0.8 0.8 0.1 1</ambient>
+            <diffuse>0.8 0.8 0.1 1</diffuse>
+          </material>
+        </visual>
+        <sensor name="camera" type="camera">
+          <pose>0 0 0 0 0 0</pose>
+          <update_rate>30</update_rate>
+          <topic>/camera</topic>
+          <gz_frame_id>camera_link</gz_frame_id>
+          <camera name="front_camera">
+            <horizontal_fov>1.047</horizontal_fov>
+            <image>
+              <width>640</width>
+              <height>480</height>
+              <format>R8G8B8</format>
+            </image>
+            <clip>
+              <near>0.1</near>
+              <far>100</far>
+            </clip>
+          </camera>
+          <always_on>true</always_on>
+          <visualize>true</visualize>
+        </sensor>
+      </link>
+
+      <!-- GPU 激光雷达（车顶中央，360°） -->
+      <link name="lidar_link">
+        <pose relative_to="chassis">0 0 0.25 0 0 0</pose>
+        <inertial>
+          <mass>0.5</mass>
+          <inertia>
+            <ixx>0.005</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>0.005</iyy><iyz>0</iyz>
+            <izz>0.005</izz>
+          </inertia>
+        </inertial>
+        <visual name="lidar_visual">
+          <geometry><cylinder><radius>0.05</radius><length>0.08</length></cylinder></geometry>
+          <material>
+            <ambient>0 0 0 1</ambient>
+            <diffuse>0 0 0 1</diffuse>
+          </material>
+        </visual>
+        <sensor name="lidar" type="gpu_lidar">
+          <pose>0 0 0.05 0 0 0</pose>
+          <update_rate>10</update_rate>
+          <topic>/lidar</topic>
+          <gz_frame_id>lidar_link</gz_frame_id>
+          <lidar>
+            <scan>
+              <horizontal>
+                <samples>360</samples>
+                <resolution>1</resolution>
+                <min_angle>-3.14159</min_angle>
+                <max_angle>3.14159</max_angle>
+              </horizontal>
+            </scan>
+            <range>
+              <min>0.12</min>
+              <max>12.0</max>
+              <resolution>0.01</resolution>
+            </range>
+          </lidar>
+          <always_on>true</always_on>
+          <visualize>true</visualize>
+        </sensor>
+      </link>
+
+      <!-- 关节 -->
+      <joint name="left_wheel_joint" type="revolute">
+        <parent>chassis</parent>
+        <child>left_wheel</child>
+        <axis>
+          <xyz>0 1 0</xyz>
+          <limit>
+            <lower>-1e16</lower>
+            <upper>1e16</upper>
+          </limit>
+        </axis>
+      </joint>
+
+      <joint name="right_wheel_joint" type="revolute">
+        <parent>chassis</parent>
+        <child>right_wheel</child>
+        <axis>
+          <xyz>0 1 0</xyz>
+          <limit>
+            <lower>-1e16</lower>
+            <upper>1e16</upper>
+          </limit>
+        </axis>
+      </joint>
+
+      <joint name="caster_joint" type="ball">
+        <parent>chassis</parent>
+        <child>caster</child>
+      </joint>
+
+      <joint name="rear_caster_joint" type="ball">
+        <parent>chassis</parent>
+        <child>rear_caster</child>
+      </joint>
+
+      <joint name="camera_joint" type="fixed">
+        <parent>chassis</parent>
+        <child>camera_link</child>
+      </joint>
+
+      <joint name="lidar_joint" type="fixed">
+        <parent>chassis</parent>
+        <child>lidar_link</child>
+      </joint>
+
+      <!-- 差速驱动：轮距 0.9m（两轮 y 各 ±0.45），半径 0.15 -->
+      <plugin filename="ignition-gazebo-diff-drive-system"
+              name="ignition::gazebo::systems::DiffDrive">
+        <left_joint>left_wheel_joint</left_joint>
+        <right_joint>right_wheel_joint</right_joint>
+        <wheel_separation>0.9</wheel_separation>
+        <wheel_radius>0.15</wheel_radius>
+        <odom_publish_frequency>50</odom_publish_frequency>
+        <topic>/model/robot/cmd_vel</topic>
+        <max_linear_acceleration>1</max_linear_acceleration>
+        <min_linear_acceleration>-1</min_linear_acceleration>
+        <max_angular_acceleration>2</max_angular_acceleration>
+        <min_angular_acceleration>-2</min_angular_acceleration>
+      </plugin>
+
+    </model>
+  </world>
+</sdf>

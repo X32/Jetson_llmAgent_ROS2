@@ -1,0 +1,25 @@
+# ===== Goal（目标）：客户端告诉服务器要做什么 =====
+# 目标移动距离（米），正数为前进，负数为后退
+float64 target_distance
+# 运动方向角（度，数学角度：0=向右，90=向上，180=向左，270=向下）
+float64 target_angle
+---
+# ===== Result（结果）：任务结束后一次性返回 =====
+# 实际移动的距离（米）
+float64 actual_distance
+# 用时（秒）
+float64 elapsed_time
+# 是否成功到达目标
+bool success
+---
+# ===== Feedback（反馈）：执行过程中持续上报 =====
+# 当前进度百分比 (0.0 ~ 1.0)
+float64 progress
+# 当前已移动距离（米）
+float64 current_distance
+# 剩余距离（米）
+float64 remaining_distance
+# 当前世界坐标x（米）
+float64 pose_x
+# 当前世界坐标y（米）
+float64 pose_y
