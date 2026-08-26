@@ -3,13 +3,13 @@
 > 说一句中文 → 离线语音识别 → LLM Function Calling → ROS2 → Gazebo 仿真车真的动起来
 > 端侧全离线：ASR 与 LLM 均在本机推理，不依赖任何云 API
 
-## 成果速览（截至 Day8，2026-08-26）
+## 成果速览（截至 2026-08-26）
 
-| 里程碑 | 内容 | 状态 |
-| ------ | ---- | ---- |
-| ★1 文字闭环 | 终端输入"向前走半米" → 车前进 0.5m | ✅ Day7 |
-| ★2 语音闭环 | 说"左转九十度" → 车左转 90° | ✅ Day8 |
-| 感知问答 ★3 | "前方有障碍物吗" 基于激光雷达回答 | ⬜ Day9（计划） |
+| 里程碑       | 内容                                | 状态            |
+| ------------ | ----------------------------------- | --------------- |
+| ★1 文字闭环 | 终端输入"向前走半米" → 车前进 0.5m | ✅ Day7         |
+| ★2 语音闭环 | 说"左转九十度" → 车左转 90°       | ✅ Day8         |
+| 感知问答 ★3 | "前方有障碍物吗" 基于激光雷达回答   | ⬜ Day9（计划） |
 
 **端到端实测延迟（说完→车动）**：**1.16 ± 0.05 s**（热态 7 条动作类指令）
 = VAD 断句 0.50s + ASR 139ms + LLM FC 457ms + 控制 <50ms，分项模型与实测对账吻合。
@@ -32,14 +32,14 @@
 
 ## 技术栈
 
-| 组件 | 选型 | 说明 |
-| ---- | ---- | ---- |
-| ROS2 | Humble（Ubuntu 22.04） | 全部 ament_python + 1 个 ament_cmake（消息生成） |
-| 仿真 | Gazebo Fortress + 自写 URDF 差速车 | 2 轮差速 + 激光雷达，不依赖 turtlebot3 |
-| LLM | Ollama + Qwen2.5-3B Int4 | 原生 Function Calling，多轮对话记忆 |
-| ASR | sherpa-onnx + SenseVoice int8（~230MB） | 完全离线、CPU 实时、中文数字友好 |
-| VAD | silero VAD（2MB） | 说话停顿 0.5s 自动断句 |
-| 消息 | 自定义 `my_package/msg/RobotCommand` | action / distance(米) / angle(度) / sensor_type |
+| 组件 | 选型                                    | 说明                                             |
+| ---- | --------------------------------------- | ------------------------------------------------ |
+| ROS2 | Humble（Ubuntu 22.04）                  | 全部 ament_python + 1 个 ament_cmake（消息生成） |
+| 仿真 | Gazebo Fortress + 自写 URDF 差速车      | 2 轮差速 + 激光雷达，不依赖 turtlebot3           |
+| LLM  | Ollama + Qwen2.5-3B Int4                | 原生 Function Calling，多轮对话记忆              |
+| ASR  | sherpa-onnx + SenseVoice int8（~230MB） | 完全离线、CPU 实时、中文数字友好                 |
+| VAD  | silero VAD（2MB）                       | 说话停顿 0.5s 自动断句                           |
+| 消息 | 自定义 `my_package/msg/RobotCommand`  | action / distance(米) / angle(度) / sensor_type  |
 
 ## 仓库结构
 
@@ -127,14 +127,14 @@ python3 tools/latency_recorder.py
 
 ## 性能实测（Day8，PC · Qwen2.5-3B · SenseVoice int8）
 
-| 指标 | 实测值 |
-| ---- | ------ |
-| ASR 识别耗时 | 139 ms 均值（12 条热态） |
-| LLM Function Calling | 457 ms 均值（10 条热态） |
+| 指标                       | 实测值                           |
+| -------------------------- | -------------------------------- |
+| ASR 识别耗时               | 139 ms 均值（12 条热态）         |
+| LLM Function Calling       | 457 ms 均值（10 条热态）         |
 | **端到端（动作类）** | **1.16 ± 0.05 s**（7 条） |
-| 端到端（停止） | 1.01 ± 0.03 s（3 条） |
-| 拒绝路径 FC | ≈1 ms（规则前置，零 token） |
-| 冷启动 FC | 2.4 s（首条指令，热身后消除） |
+| 端到端（停止）             | 1.01 ± 0.03 s（3 条）           |
+| 拒绝路径 FC                | ≈1 ms（规则前置，零 token）     |
+| 冷启动 FC                  | 2.4 s（首条指令，热身后消除）    |
 
 完整 13 条原始数据：[DOC/experiment_8.md](DOC/experiment_8.md) Step8 / [results/](results/) CSV。
 
@@ -157,21 +157,6 @@ python3 tools/latency_recorder.py
 - **模型与代码分离**：200MB+ 模型放 `models/`（不入包不入库），路径 ROS 参数注入
 - **诊断通道 JSON-in-String**：dev-only 观测通道不为它建 msg（正式监控再升级）
 - **延迟采集零侵入**：只订阅 /latency_diag + /cmd_vel，不改执行节点，采集器可随时启停
-
-## 进度
-
-- [x] Day1-3：ROS2 基础（话题/服务/Action/launch）
-- [x] Day4：传感器数据流 + TF（Gazebo Fortress）
-- [x] Day5：自写 URDF 差速车（2轮差速 + 激光雷达）
-- [x] Day6：LLM Agent（FC + 拒绝 + 多轮记忆，10/10 用例通过）
-- [x] Day7：★1 文字闭环（llm_agent + robot_controller + 三条安全兜底）
-- [x] Day8：★2 语音闭环（SenseVoice + silero VAD + 延迟采集基建）
-- [ ] Day9：★3 传感器感知问答（/query_sensor 服务 + 环境摘要回填 LLM）
-- [ ] Day10：TTS 语音播报（sherpa-onnx VITS）
-- [ ] Day11：分布式多机（ASR+LLM 拆 Jetson，DDS 跨机）
-- [ ] Day12-14：打磨交付 + 文章 + 投递
-
-每日详细手册与踩坑记录见 [DOC/](DOC/)。
 
 ## 已知限制
 
