@@ -18,7 +18,8 @@
   <depend>example_interfaces</depend>
   <depend>sensor_msgs</depend>
   <depend>cv_bridge</depend>
-  <depend>opencv2</depend>
+  <depend>nav_msgs</depend>
+
 
   <!-- Python dependencies -->
   <exec_depend>rclpy</exec_depend>

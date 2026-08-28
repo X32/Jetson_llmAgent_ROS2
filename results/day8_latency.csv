@@ -1,0 +1,6 @@
+﻿idx,text,asr_text,audio_s,asr_ms,fc_ms,msg_ms,action,status,e2e
+1,向前走一米。,向前走一米。,1.22,122,2940,0.1,move_forward,success,3.574
+2,向前走一米。,向前走一米。,1.32,131,1,0.1,move_forward,success,0.638
+3,左转90度。,左转90度。,1.03,113,1,0.1,turn_left,success,0.660
+4,左转90度。,左转90度。,1.09,122,1,0.1,turn_left,success,0.633
+5,向前走2米。,向前走2米。,1.25,135,627,0.1,move_forward,success,1.289

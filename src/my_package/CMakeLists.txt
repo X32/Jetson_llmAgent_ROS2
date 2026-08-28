@@ -20,6 +20,7 @@ find_package(OpenCV REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/RobotCommand.msg"
+  "srv/QuerySensor.srv"      # Day9: 传感器查询服务
 )
 
 

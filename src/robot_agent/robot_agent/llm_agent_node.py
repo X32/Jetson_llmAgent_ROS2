@@ -9,9 +9,12 @@ import os
 import time
 from ament_index_python.packages import get_package_share_directory
 import rclpy
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from std_msgs.msg import String
 from my_package.msg import RobotCommand
+from my_package.srv import QuerySensor
 
 from robot_agent.llm_core import LLMAgent
 
@@ -24,14 +27,60 @@ class LLMAgentNode(Node):
         config_path = os.path.join(
             get_package_share_directory('robot_agent'), 'config', 'llm_config.json')
         self.agent = LLMAgent(config_path=config_path)
+          # Day9 死锁预防：订阅回调与服务客户端放同一个可重入回调组，
+        # 配合 MultiThreadedExecutor，on_voice 里才能同步等服务结果（见 2.4 节）
+        self.cb_group = ReentrantCallbackGroup()
 
-        self.sub = self.create_subscription(String, 'voice_text', self.on_voice, 10)
+        self.sub = self.create_subscription(String, 'voice_text', self.on_voice, 10, callback_group=self.cb_group)
         self.cmd_pub = self.create_publisher(RobotCommand, 'robot_command', 10)
+        self.answer_pub = self.create_publisher(String, 'agent_answer', 10)   # Day9 新增
         # Step8 延迟采集：诊断通道（JSON-in-String，dev-only 不建 msg）
-        self.diag_pub = self.create_publisher(String, 'latency_diag', 10)
+        self.diag_pub = self.create_publisher(String, 'latency_diag', 10, callback_group=self.cb_group)
+        self.query_client = self.create_client(QuerySensor, 'query_sensor', callback_group=self.cb_group)        # Day9 新增
 
         self.get_logger().info(
             f'llm_agent 就绪（模型 {self.agent.model}），等待 /voice_text ...')
+        
+    def handle_query(self, result, t0):
+        """Day9 工具执行体：调 /query_sensor 服务 → 结果回填 → 二次推理 → 发布回答"""
+        sensor_type = result['parameters'].get('type', 'all')
+
+        # 服务调用（~ms 级；2 秒超时兜底）
+        t_s0 = time.perf_counter()
+        summary = '传感器服务无响应'
+        if self.query_client.wait_for_service(timeout_sec=1.0):
+            req = QuerySensor.Request()
+            req.type = sensor_type
+            future = self.query_client.call_async(req)
+            t_deadline = time.time() + 2.0
+            while not future.done() and time.time() < t_deadline:
+                time.sleep(0.02)
+            if future.done() and future.result() is not None:
+                summary = future.result().summary
+        t_s1 = time.perf_counter()
+
+        # 真实结果回填 → 二次推理 → 自然语言回答
+        answer = self.agent.followup_tool_result('query_sensor', summary)
+        t2 = time.perf_counter()
+
+        self.get_logger().info(
+            f'[问答] 传感器数据: {summary}')
+        self.get_logger().info(
+            f'[问答] 回答: {answer} | '
+            f'[延迟] FC1={1000*(t_s0-t0):.0f}ms 服务={1000*(t_s1-t_s0):.0f}ms '
+            f'FC2={1000*(t2-t_s1):.0f}ms')
+
+        msg = String()
+        msg.data = answer
+        self.answer_pub.publish(msg)
+
+        # 延迟采集：问答行 fc_ms = 两次推理总和（无车动，recorder 端到端列会超时留空，正常）
+        diag = {'stage': 'llm', 'text': result['user_input'], 'status': 'success',
+                'action': 'query_sensor', 'fc_ms': round(1000*(t2-t0)),
+                'msg_ms': 0.0, 'done_at': time.time()}
+        d = String()
+        d.data = json.dumps(diag, ensure_ascii=False)
+        self.diag_pub.publish(d)
 
     def on_voice(self, msg: String):
         t0 = time.perf_counter()
@@ -52,6 +101,10 @@ class LLMAgentNode(Node):
             return
 
         t1 = time.perf_counter()
+         # ===== Day9 分流：查询类走工具执行体，不发 /robot_command =====
+        if result['action'] == 'query_sensor':
+            self.handle_query(result, t0)
+            return
 
         # ===== JSON → msg：全链路唯一的转换边界 =====
         cmd = RobotCommand()
@@ -81,8 +134,10 @@ class LLMAgentNode(Node):
 def main():
     rclpy.init()
     node = LLMAgentNode()
+    executor = MultiThreadedExecutor()
+    executor.add_node(node)
     try:
-        rclpy.spin(node)
+        executor.spin()
     except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):
         pass
     finally:

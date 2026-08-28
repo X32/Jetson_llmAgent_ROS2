@@ -1,0 +1,10 @@
+# Day9: llm_agent(工具执行体) → state_query(传感器汇总) 的查询契约
+# 请求
+string type          # lidar / odom / all
+---
+# 响应
+string summary       # 环境摘要（中文，可直接回填 LLM 或播报）
+float32 front_min    # 前方最近障碍(米)，无数据=-1
+float32 left_min     # 左侧最近(米)，无数据=-1
+float32 right_min    # 右侧最近(米)，无数据=-1
+float32 traveled     # 累计行驶里程(米)，无数据=-1

@@ -78,14 +78,14 @@
       "type": "function",
       "function": {
         "name": "query_sensor",
-        "description": "查询传感器数据",
+        "description": "查询机器人传感器数据。lidar=激光雷达各方向障碍距离；odom=行驶里程/位置/朝向；all=全部",
         "parameters": {
           "type": "object",
           "properties": {
             "type": {
               "type": "string",
-              "description": "传感器类型",
-              "enum": ["lidar", "camera"]
+              "description": "查询类型",
+              "enum": ["lidar", "odom", "all"]
             }
           },
           "required": ["type"]
