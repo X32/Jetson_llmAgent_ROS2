@@ -20,7 +20,7 @@ import sherpa_onnx
 
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import String
+from std_msgs.msg import Bool, String
 
 SAMPLE_RATE = 16000   # SenseVoice 要求的采样率
 VAD_BLOCK = 512       # silero VAD 要求的窗长（16kHz 下用 512）
@@ -74,9 +74,21 @@ class VoiceInputNode(Node):
         # Step8 延迟采集：诊断通道（JSON-in-String，dev-only 不建 msg）
         self.diag_pub = self.create_publisher(String, 'latency_diag', 10)
 
+        # Day10 回声门控：播报期间丢弃 VAD 段落，防止机器人"听到自己说话"
+        # （不自问自答的前提；MUTE_TAIL 兜房间混响）
+        self.tts_mute_until = 0.0
+        self.create_subscription(Bool, 'tts_state', self.on_tts_state, 10)
+
         # 麦克风采集是阻塞循环，放独立线程（主线程留给 rclpy.spin）
         threading.Thread(target=self.mic_loop, daemon=True).start()
         self.get_logger().info(f'voice_input 就绪（{self.mode} 模式），等待说话 ...')
+
+    def on_tts_state(self, msg: Bool):
+        """tts_node 播报状态回调：true=开始播报（一直静音），false=结束（留0.3s尾巴）"""
+        if msg.data:
+            self.tts_mute_until = float('inf')
+        else:
+            self.tts_mute_until = time.time() + 0.3
 
     # ================= 核心：识别 + 发布 =================
     def recognize_and_publish(self, samples: np.ndarray, t_pop: float = 0.0):
@@ -130,6 +142,11 @@ class VoiceInputNode(Node):
                     self.in_speech = False
                     # 冷却期内丢弃（同一句话的尾音可能被 VAD 切成第二段）
                     if time.time() - self.last_publish < self.cooldown:
+                        continue
+                    # 播报门控：机器人正在说话（或刚说完0.3s内）时丢弃本段——
+                    # 这段音频是扬声器回声，不是用户指令
+                    if time.time() < self.tts_mute_until:
+                        self.get_logger().info('播报中，丢弃本段音频（回声门控）')
                         continue
                     self.recognize_and_publish(segment, t_pop)
 
