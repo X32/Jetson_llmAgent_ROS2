@@ -1,0 +1,97 @@
+{
+  "base_url": "http://localhost:8000",
+  "model": "/home/zy/Desktop/workplace/models/qwen2.5-coder-3b-instruct-q4_k_m.gguf",
+  "options": {
+    "temperature": 0.1,
+    "max_tokens": 4096
+  },
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "move_forward",
+        "description": "控制机器人向前移动指定距离",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "distance": {
+              "type": "number",
+              "description": "移动距离（米），范围 0.05~10.0",
+              "minimum": 0.05,
+              "maximum": 10.0
+            }
+          },
+          "required": ["distance"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "turn_left",
+        "description": "控制机器人向左旋转指定角度",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "angle": {
+              "type": "number",
+              "description": "旋转角度（度），范围 1~360",
+              "minimum": 1,
+              "maximum": 360
+            }
+          },
+          "required": ["angle"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "turn_right",
+        "description": "控制机器人向右旋转指定角度",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "angle": {
+              "type": "number",
+              "description": "旋转角度（度），范围 1~360",
+              "minimum": 1,
+              "maximum": 360
+            }
+          },
+          "required": ["angle"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "stop",
+        "description": "停止机器人运动",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "query_sensor",
+        "description": "查询机器人传感器数据。lidar=激光雷达各方向障碍距离；odom=行驶里程/位置/朝向；all=全部",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "description": "查询类型",
+              "enum": ["lidar", "odom", "all"]
+            }
+          },
+          "required": ["type"]
+        }
+      }
+    }
+  ]
+}

@@ -32,18 +32,25 @@ class VoiceInputNode(Node):
 
         # ===== 参数：模型路径参数化（200MB+ 模型不进包不进 git，路径由外部传入）=====
         self.declare_parameter(
-            'model_dir', '/mnt/apfs/workplace/ROS2/models/asr/sense-voice')
+            'model_dir', '/home/zy/Desktop/workplace/Jetson_llmAgent_ROS2/models/asr/sense-voice')
         self.declare_parameter(
-            'vad_model', '/mnt/apfs/workplace/ROS2/models/asr/silero_vad.onnx')
+            'vad_model', '/home/zy/Desktop/workplace/Jetson_llmAgent_ROS2/models/asr/silero_vad.onnx')
         self.declare_parameter('mode', 'vad')            # vad / manual
         self.declare_parameter('manual_duration', 4.0)   # manual 模式录音秒数
         self.declare_parameter('cooldown', 1.0)          # 发布后冷却(s)，防尾音被切成第二段
+        # 麦克风设备：Jetson 的 USB 麦硬件只支持 48kHz，直连开 16kHz 流会失败，
+        # 必须走 pulse（PulseAudio 自动重采样到 16kHz）；PC 用系统默认即可
+        self.declare_parameter(
+            'device', 'pulse' if os.uname().machine == 'aarch64' else '')
 
         model_dir = self.get_parameter('model_dir').value
         vad_model = self.get_parameter('vad_model').value
         self.mode = self.get_parameter('mode').value
         self.manual_duration = self.get_parameter('manual_duration').value
         self.cooldown = self.get_parameter('cooldown').value
+        device = self.get_parameter('device').value
+        # 'pulse'/'' → None = 用系统默认选择；数字字符串 → PortAudio 索引
+        self.device = int(device) if str(device).isdigit() else (device or None)
 
         # ===== ASR 引擎：SenseVoice int8（CPU 实时）=====
         self.recognizer = sherpa_onnx.OfflineRecognizer.from_sense_voice(
@@ -124,7 +131,7 @@ class VoiceInputNode(Node):
         if self.mode == 'manual':
             return self.manual_loop()
 
-        with sd.InputStream(channels=1, dtype='float32',
+        with sd.InputStream(device=self.device, channels=1, dtype='float32',
                             samplerate=SAMPLE_RATE, blocksize=VAD_BLOCK) as stream:
             self.get_logger().info('麦克风已开（VAD 自动断句），请说短指令，如"左转九十度"')
             while rclpy.ok():
@@ -159,7 +166,8 @@ class VoiceInputNode(Node):
                 return
             self.get_logger().info('录音中 ...')
             audio = sd.rec(int(self.manual_duration * SAMPLE_RATE),
-                           samplerate=SAMPLE_RATE, channels=1, dtype='float32')
+                           samplerate=SAMPLE_RATE, channels=1, dtype='float32',
+                           device=self.device)
             sd.wait()
             # manual 模式 t_pop=录音结束时刻（无 VAD 等待，采集器行内口径为"录完→车动"）
             self.recognize_and_publish(audio[:, 0], t_pop=time.time())

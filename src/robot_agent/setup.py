@@ -11,6 +11,7 @@ setup(
         ('share/' + package_name, ['package.xml']),
          # config 和 launch 跟包安装（节点从安装目录读配置，不依赖工作目录）
         ('share/robot_agent/config', ['robot_agent/config/llm_config.json']),
+        ('share/robot_agent/config', ['robot_agent/config/llm_config_llamacpp.json']),
         ('share/robot_agent/launch', ['robot_agent/launch/robot_agent_bringup.launch.py']),
     ],
     install_requires=['setuptools'],

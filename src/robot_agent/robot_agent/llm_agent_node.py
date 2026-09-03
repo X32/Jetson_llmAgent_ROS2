@@ -16,16 +16,31 @@ from std_msgs.msg import String
 from my_package.msg import RobotCommand
 from my_package.srv import QuerySensor
 
-from robot_agent.llm_core import LLMAgent
+# 支持切换到 llama.cpp 版本（通过环境变量 LLAMACPP=1 启用）
+# 在导入时就决定使用哪个核心，避免加载不需要的模块
+if os.environ.get('LLAMACPP') == '1':
+    from robot_agent.llm_core_llamacpp import LLMAgent
+    backend = "llama.cpp"
+else:
+    from robot_agent.llm_core import LLMAgent
+    backend = "Ollama"
 
 
 class LLMAgentNode(Node):
     def __init__(self):
         super().__init__('llm_agent')
 
-        # 大脑核心（Day6 移植），配置从安装目录读（跟包走，不依赖工作目录）
+        # 大脑核心，配置从安装目录读（跟包走，不依赖工作目录）
+        # 根据 LLAMACPP 环境变量选择配置文件
+        if os.environ.get('LLAMACPP') == '1':
+            config_file = 'llm_config_llamacpp.json'
+            backend = "llama.cpp"
+        else:
+            config_file = 'llm_config.json'
+            backend = "Ollama"
+
         config_path = os.path.join(
-            get_package_share_directory('robot_agent'), 'config', 'llm_config.json')
+            get_package_share_directory('robot_agent'), 'config', config_file)
         self.agent = LLMAgent(config_path=config_path)
           # Day9 死锁预防：订阅回调与服务客户端放同一个可重入回调组，
         # 配合 MultiThreadedExecutor，on_voice 里才能同步等服务结果（见 2.4 节）
@@ -39,7 +54,7 @@ class LLMAgentNode(Node):
         self.query_client = self.create_client(QuerySensor, 'query_sensor', callback_group=self.cb_group)        # Day9 新增
 
         self.get_logger().info(
-            f'llm_agent 就绪（模型 {self.agent.model}），等待 /voice_text ...')
+            f'llm_agent 就绪（后端={backend}，模型={self.agent.model}），等待 /voice_text ...')
         
     def handle_query(self, result, t0):
         """Day9 工具执行体：调 /query_sensor 服务 → 结果回填 → 二次推理 → 发布回答"""
@@ -97,6 +112,10 @@ class LLMAgentNode(Node):
             # 不发布任何指令 → controller 收不到新命令，零速心跳兜底，车保持静止
             self.get_logger().warn(
                 f"不发布指令（{result['status']}）: {result.get('message', '')[:80]}")
+            # 调试：no_tool 时打印模型原始输出，便于定位（正式版可关闭）
+            if result.get('llm_response'):
+                self.get_logger().warn(
+                    f"[调试] 模型原始输出: {result['llm_response'][:200]}")
             self.publish_diag(text, result, 1000*(time.perf_counter()-t0), 0.0)
             return
 

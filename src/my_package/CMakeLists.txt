@@ -30,10 +30,10 @@ add_executable(subscriber_node src/subscriber_node.cpp)
 add_executable(comprehensive_node src/comprehensive_node.cpp)
 add_executable(service_server src/service_server.cpp)
 add_executable(service_client src/service_client.cpp)
-# OpenCV冲突时暂时注释掉摄像头节点
-add_executable(camera_publisher src/camera_publisher.cpp)
-add_executable(camera_subscriber src/camera_subscriber.cpp)
-add_executable(simple_camera_publisher src/simple_camera_publisher.cpp)
+# OpenCV冲突时暂时注释掉摄像头节点（GDAL/libcurl兼容性问题）
+# add_executable(camera_publisher src/camera_publisher.cpp)
+# add_executable(camera_subscriber src/camera_subscriber.cpp)
+# add_executable(simple_camera_publisher src/simple_camera_publisher.cpp)
 
 # 设置目标依赖项（包含ROS2头文件和库）
 ament_target_dependencies(publisher_node
@@ -62,29 +62,29 @@ ament_target_dependencies(service_client
 )
 
 # 摄像头节点需要额外链接OpenCV（暂时注释掉避免版本冲突）
-ament_target_dependencies(camera_publisher
- rclcpp
- sensor_msgs
- cv_bridge
-)
-
-target_link_libraries(camera_publisher ${OpenCV_LIBS})
-
-ament_target_dependencies(camera_subscriber
- rclcpp
- sensor_msgs
- cv_bridge
-)
-
-target_link_libraries(camera_subscriber ${OpenCV_LIBS})
-
-# 简化版摄像头发布者（不依赖cv_bridge）
-ament_target_dependencies(simple_camera_publisher
- rclcpp
- sensor_msgs
-)
-
-target_link_libraries(simple_camera_publisher ${OpenCV_LIBS})
+# ament_target_dependencies(camera_publisher
+#  rclcpp
+#  sensor_msgs
+#  cv_bridge
+# )
+#
+# target_link_libraries(camera_publisher ${OpenCV_LIBS})
+#
+# ament_target_dependencies(camera_subscriber
+#  rclcpp
+#  sensor_msgs
+#  cv_bridge
+# )
+#
+# target_link_libraries(camera_subscriber ${OpenCV_LIBS})
+#
+# # 简化版摄像头发布者（不依赖cv_bridge）
+# ament_target_dependencies(simple_camera_publisher
+#  rclcpp
+#  sensor_msgs
+# )
+#
+# target_link_libraries(simple_camera_publisher ${OpenCV_LIBS})
 
 # 安装Python脚本
 install(PROGRAMS
@@ -95,12 +95,13 @@ install(PROGRAMS
 )
 
 # 安装识别相关文件（直接安装文件内容，避免嵌套目录）
-install(FILES
-  scripts/imgNet/resnet18_imagenet.onnx
-  scripts/imgNet/imagenet_class_index.csv
-  scripts/imgNet/SimHei.ttf
-  DESTINATION share/${PROJECT_NAME}/imgNet
-)
+# 暂时注释掉，模型文件不存在且非核心功能所需
+# install(FILES
+#   scripts/imgNet/resnet18_imagenet.onnx
+#   scripts/imgNet/imagenet_class_index.csv
+#   scripts/imgNet/SimHei.ttf
+#   DESTINATION share/${PROJECT_NAME}/imgNet
+# )
 
 # 安装可执行文件到lib目录
 install(TARGETS
@@ -109,9 +110,9 @@ install(TARGETS
   comprehensive_node
   service_server
   service_client
- camera_publisher
- camera_subscriber
- simple_camera_publisher
+  # camera_publisher
+  # camera_subscriber
+  # simple_camera_publisher
   DESTINATION lib/${PROJECT_NAME}
 )
 
