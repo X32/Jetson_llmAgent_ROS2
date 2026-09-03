@@ -1,6 +1,7 @@
 #!/bin/bash
 # PC ROS2 跨平台通信配置
-
+source /opt/ros/humble/setup.bash
+source install/setup.bash
 # 设置环境变量
 export ROS_DOMAIN_ID=0
 export ROS_LOCALHOST_ONLY=0
