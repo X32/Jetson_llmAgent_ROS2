@@ -1,0 +1,84 @@
+"""E2 适配层（Step 3 核心交付）：robomimic Lift(ph) → ACT 训练格式
+
+输入: /mnt/apfs/workplace/act/data/lift_ph/image_v15.hdf5   （states 重放渲染出的观测集）
+输出: /mnt/apfs/workplace/act/data/lift_ph_act/episode_N.hdf5 ×200（ACT utils.EpisodicDataset 直读）
+
+契约对齐（对照手册 2.4 表逐格）：
+  robomimic obs                              →  ACT 训练样本
+  ─────────────────────────────────────────
+  robot0_eef_pos(3)+eef_quat(4)+gripper_qpos(2) → /observations/qpos (T,9)   ← 本体态 concat
+  robot0_eef_vel_lin(3)                        → /observations/qvel (T,3)   ← key 兼容(训练不消费)
+  agentview_image (T,84,84,3)                  → /observations/images/agentview_image
+  robot0_eye_in_hand_image (T,84,84,3)         → /observations/images/robot0_eye_in_hand_image
+  actions (T,7) OSC_POSE 归一化增量，值域[-1,1]  → /action 原样（不改语义——契约表第3行）
+  attrs['sim'] = 1
+
+归一化说明（五问#5 对齐）：本脚本不做归一化——ACT 官方在 utils.get_norm_stats 里
+对 qpos/action 做数据集统计 z-score、图像 /255+ImageNet——我们沿用官方全部行为，
+保证训练=评估同一套变换。
+
+用法: unset PYTHONPATH && python e2_adapter.py [--src ...] [--dst ...] [--max N]
+"""
+import argparse
+import os
+
+import h5py
+import numpy as np
+
+CAM_RENAME = {                       # robomimic obs key → ACT 相机名（官方惯例不带 _image 后缀）
+    'agentview_image': 'agentview',
+    'robot0_eye_in_hand_image': 'robot0_eye_in_hand',
+}
+
+ap = argparse.ArgumentParser()
+ap.add_argument('--src', default='/mnt/apfs/workplace/act/data/lift_ph/image_v15.hdf5')
+ap.add_argument('--dst', default='/mnt/apfs/workplace/act/data/lift_ph_act')
+ap.add_argument('--max', type=int, default=0, help='只转前 N 条(冒烟用), 0=全部')
+ap.add_argument('--pad-to', type=int, default=64, help='统一轨迹长度（ACT DataLoader 要求等长；'
+                                                       '尾部用末步重复填充，Dataset 的 is_pad 自动标记）')
+args = ap.parse_args()
+
+os.makedirs(args.dst, exist_ok=True)
+f = h5py.File(args.src, 'r')
+demos = sorted([k for k in f['data'].keys() if k.startswith('demo')],
+               key=lambda s: int(s.split('_')[1]))
+if args.max:
+    demos = demos[:args.max]
+
+stats = dict(n=0, lens=[], qpos_dim=9, action_dim=7)
+def pad(x, T_out):
+    """尾部重复末步填充到 T_out（图像/动作/状态通用）"""
+    T = x.shape[0]
+    if T >= T_out:
+        return x[:T_out]
+    pad_shape = (T_out - T,) + x.shape[1:]
+    return np.concatenate([x, np.repeat(x[-1:], pad_shape[0], axis=0)], axis=0)
+
+for i, name in enumerate(demos):
+    d = f[f'data/{name}']
+    obs, act = d['obs'], d['actions']
+    T_out = args.pad_to
+    qpos = np.concatenate([obs['robot0_eef_pos'][()],
+                           obs['robot0_eef_quat'][()],
+                           obs['robot0_gripper_qpos'][()]], axis=1)   # (T,9)
+    qvel = obs['robot0_eef_vel_lin'][()]                              # (T,3)
+    out = h5py.File(os.path.join(args.dst, f'episode_{i}.hdf5'), 'w')
+    out.attrs['sim'] = 1
+    out.create_dataset('/action', data=pad(act, T_out).astype(np.float32))
+    out.create_dataset('/observations/qpos', data=pad(qpos, T_out).astype(np.float32))
+    out.create_dataset('/observations/qvel', data=pad(qvel, T_out).astype(np.float32))
+    g = out.create_group('/observations/images')
+    for src_cam, dst_cam in CAM_RENAME.items():
+        g.create_dataset(dst_cam, data=pad(obs[src_cam][()], T_out))  # uint8 原样
+    out.close()
+    stats['n'] += 1
+    stats['lens'].append(act.shape[0])
+
+lens = np.array(stats['lens'])
+print(f"✅ 转换完成 {stats['n']} 集 → {args.dst}/episode_*.hdf5")
+print(f"轨迹长度: min={lens.min()} mean={lens.mean():.0f} max={lens.max()}")
+print(f"维度表（5.2 交付，E3 导 ONNX 抄走）:")
+print(f"  图像: 2 相机 × C3×H84×W84 uint8（/255→ImageNet 归一化进网络）")
+print(f"  qpos: {stats['qpos_dim']} 维 = eef_pos(3)+eef_quat(4)+gripper_qpos(2)，z-score(数据集统计)")
+print(f"  action: {stats['action_dim']} 维 OSC_POSE 归一化增量，z-score(数据集统计)")
+print(f"  chunk k=100（>轨迹长，is_pad 掩码兜底）, 控制频率 20Hz")

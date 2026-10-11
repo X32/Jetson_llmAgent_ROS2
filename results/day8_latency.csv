@@ -1,5 +1,8 @@
 ﻿idx,text,asr_text,audio_s,asr_ms,fc_ms,msg_ms,action,status,e2e
-1,前方有没有障碍,(无ASR事件),,,2278,0.0,query_sensor,success,
-2,我走了多远,(无ASR事件),,,2462,0.0,query_sensor,success,
-3,现在周围什么情况,(无ASR事件),,,4589,0.0,query_sensor,success,
-4,向前走1米,(无ASR事件),,,3,0.5,move_forward,success,
+1,前进1米。,前进1米。,1.54,157,1,0.1,move_forward,success,0.680
+2,左转90度。,左转90度。,1.16,123,1,0.1,turn_left,success,0.659
+3,前面有障碍物吗,前面有障碍物吗？,1.77,176,3622,0.0,query_sensor,success,
+4,走了大约2.93米。,走了大约2.93米。,1.96,190,1199,0.0,,no_tool,
+5,我走了多远,我走了多远？,1.35,147,1843,0.0,query_sensor,success,
+6,现在周围什么情况,现在周围什么情况？,2.37,207,1861,0.0,query_sensor,success,
+7,在周围的情况是前方最近障碍0.83米判定有障碍阈值1.0米。,在周围的情况是前方最近障碍0.83米判定有障碍阈值1.0米。,6.98,563,2184,0.0,,no_tool,

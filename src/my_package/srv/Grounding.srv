@@ -1,0 +1,7 @@
+# E1: 服务触发的 grounding 请求（不是图像流——2.5s 级慢推理按需触发）
+string target        # 要定位的目标，如 "红色杯子"
+string image_path    # 测试图绝对路径（v2 扩展：留空=取最新摄像头帧）
+---
+my_package/DetectedObject[] objects
+float64 latency_ms   # VLM 推理耗时
+string error         # 空=成功

@@ -7,6 +7,7 @@ import sounddevice as sd
 import sherpa_onnx
 
 MODEL_DIR = '/mnt/apfs/workplace/ROS2/models/asr/sense-voice'
+MODEL_DIR = '/mnt/apfs/workplace/ROS2/models/asr/sense-voice'
 SR = 16000   # 语音模型标准采样率
 
 recognizer = sherpa_onnx.OfflineRecognizer.from_sense_voice(

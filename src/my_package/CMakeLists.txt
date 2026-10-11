@@ -21,6 +21,10 @@ find_package(rosidl_default_generators REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/RobotCommand.msg"
   "srv/QuerySensor.srv"      # Day9: 传感器查询服务
+  "msg/DetectedObject.msg"   # E1: grounding 框（label+像素坐标+格式规整度）
+  "msg/DetectedObjects.msg"  # E1: /detected_objects 消息体
+  "srv/Grounding.srv"        # E1: 服务触发 grounding（慢推理按需，非图像流）
+  DEPENDENCIES std_msgs      # E1: DetectedObjects.msg 引用 std_msgs/Header，必须声明
 )
 
 

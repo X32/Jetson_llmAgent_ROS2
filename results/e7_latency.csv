@@ -1,0 +1,1 @@
+task_id,text,status,success,s1_intent,s2_snapshot,s3_vlm,orch_ms,s4_coord,s5_first_step,s6_exec,sum,total,residual,xy_err_cm,gate,steps,chunk_p50,grade,try_,first_chunk_ms

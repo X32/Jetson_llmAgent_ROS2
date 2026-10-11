@@ -13,6 +13,7 @@ setup(
         ('share/robot_agent/config', ['robot_agent/config/llm_config.json']),
         ('share/robot_agent/config', ['robot_agent/config/llm_config_llamacpp.json']),
         ('share/robot_agent/launch', ['robot_agent/launch/robot_agent_bringup.launch.py']),
+        ('share/robot_agent/launch', ['robot_agent/launch/full_system.launch.py']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
